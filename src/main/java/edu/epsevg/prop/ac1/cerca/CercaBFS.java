@@ -7,7 +7,6 @@ import java.util.*;
 
 public class CercaBFS extends Cerca {
     public CercaBFS(boolean usarLNT) { super(usarLNT); }
-
     @Override
     public void ferCerca(Mapa inicial, ResultatCerca rc) {
         Queue<Node> LNO = new LinkedList<>(); 
