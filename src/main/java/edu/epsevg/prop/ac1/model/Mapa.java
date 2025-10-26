@@ -207,9 +207,18 @@ public class Mapa {
      */
     public List<Moviment> getAccionsPossibles() {
         List<Moviment> res = new ArrayList<>();
-        // ===============================================
-        //@TODO: A IMPLEMENTAR !!!!!!
-        // ===============================================
+        for(int agentId = 0; agentId < agents.size(); agentId++){
+            Posicio posicioActual = agents.get(agentId);
+            for( Direccio dir: Direccio.values()){
+                Posicio desti = posicioActual.translate(dir);
+                int cell = getCell(desti);
+                if(cell == PARET) continue; //Comprova q no hi ha paret
+                if(Character.isUpperCase((char) cell) && !portaObrible((char) cell)) continue; //Comprova que la casella es una porta i no te sortida
+                if(agents.contains(desti)) continue; //Comprova que la casella no hi hagi un altre agent
+                boolean recullClau = teClau((char) cell);
+                res.add(new Moviment(agentId + 1, dir, recullClau));
+            }
+        }
         return res;
     }
 
@@ -224,11 +233,13 @@ public class Mapa {
 
     @Override
     public boolean equals(Object o) {
-        
-        // ===============================================
-        //@TODO: A IMPLEMENTAR !!!!!!
-        // ===============================================
-        
+        if(this == o) return true;
+        if(o == null || getClass() != o.getClass()) return false;
+        Mapa mapa = (Mapa) o;
+        if(!agents.equals(mapa.agents)) return false;
+        if(clausMask != mapa.clausMask) return false;
+        if(grid.length != mapa.grid.length) return false;
+        for(int i = 0; i < grid.length; i++) if (!Arrays.equals(grid[i], mapa.grid[i])) return false;
         return true;
     }
 
