@@ -16,20 +16,19 @@ public class CercaBFS extends Cerca {
         LNO.add(nodeInicial);
         while(!LNO.isEmpty()){
             Node actual = LNO.poll();
-            
-            if (LNT.contains(actual.estat)) continue;
-            rc.incNodesExplorats();
-            LNT.add(actual.estat);
-            
-            boolean solucioTrobada = false;
-            for (Posicio posAgent : actual.estat.getAgents()) {
-                if (actual.estat.esSortida(posAgent)) {
-                    solucioTrobada = true;
-                    break;
+            if(usarLNT){
+                if (LNT.contains(actual.estat)) continue;
+                LNT.add(actual.estat);
+            }else{
+                if (estaEnCami(actual.pare, actual.estat)) {
+                    rc.incNodesTallats();
+                    continue;
                 }
             }
             
-            if(solucioTrobada){
+            rc.incNodesExplorats();
+            
+            if(actual.estat.esMeta()){
                 rc.setCami(reconstruirCami(actual));
                 return;
             }
@@ -38,11 +37,11 @@ public class CercaBFS extends Cerca {
             for(Moviment accio : accions){
                 Mapa nouEstat = actual.estat.mou(accio);
                 
-                if (!LNT.contains(nouEstat)) {
-                    Node nouNode = new Node(nouEstat, actual, accio, 
+                if (usarLNT && LNT.contains(nouEstat)) continue;
+                Node nouNode = new Node(nouEstat, actual, accio, 
                                        actual.depth + 1, actual.g + 1);
-                    LNO.add(nouNode);
-                }    
+                LNO.add(nouNode);
+                 
             }
         }
         rc.setCami(null);
@@ -60,4 +59,15 @@ public class CercaBFS extends Cerca {
         
         return cami;
     } 
+    
+    
+    private boolean estaEnCami(Node node, Mapa estat) {
+        while (node != null) {
+            if (node.estat.equals(estat)) {
+                return true;
+            }
+            node = node.pare;
+        }
+        return false;
+    }
 }

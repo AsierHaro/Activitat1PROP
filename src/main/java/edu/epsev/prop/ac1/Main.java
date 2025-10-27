@@ -1,4 +1,4 @@
-package edu.epsevg.prop.ac1;
+package edu.epsev.prop.ac1;
 
 import edu.epsevg.prop.ac1.cerca.*;
 import edu.epsevg.prop.ac1.cerca.heuristica.HeuristicaAvancada;
