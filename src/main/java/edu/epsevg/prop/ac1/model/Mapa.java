@@ -177,6 +177,7 @@ public class Mapa {
      * ja fet.
      */
     public Mapa mou(Moviment acc) {
+        //
         Mapa nou = new Mapa(this);
         int aid = acc.getAgentId();
         if (aid < 1 || aid > nou.agents.size()) throw new IllegalArgumentException("Agent id invalid");
