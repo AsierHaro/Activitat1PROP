@@ -1,6 +1,7 @@
 package edu.epsev.prop.ac1;
 
 import edu.epsevg.prop.ac1.cerca.*;
+////
 import edu.epsevg.prop.ac1.cerca.heuristica.HeuristicaAvancada;
 import edu.epsevg.prop.ac1.cerca.heuristica.HeuristicaBasica;
 import edu.epsevg.prop.ac1.model.Mapa;
