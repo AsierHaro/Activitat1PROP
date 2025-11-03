@@ -20,16 +20,21 @@ public class CercaAStar extends Cerca {
         PriorityQueue<Node> LNO = new PriorityQueue<>(
             Comparator.comparingInt((Node n) -> n.g + heur.h(n.estat))
         );
-        Set<Mapa> LNT = new HashSet<>();
+        Map<Mapa, Integer> LNT = new HashMap<>();
+        int maxLNO = 0;
         
         Node nodeInicial = new Node(inicial, null, null, 0, 0);
         LNO.add(nodeInicial);
         
         while(!LNO.isEmpty()){
             Node actual = LNO.poll();
-            if(usarLNT){
-                if (LNT.contains(actual.estat)) continue;
-                LNT.add(actual.estat);
+            if(LNO.size() > maxLNO) maxLNO = LNO.size();
+            if (usarLNT) {
+                if (LNT.containsKey(actual.estat) && LNT.get(actual.estat) <= actual.g) {
+                    rc.incNodesTallats();
+                    continue;
+                }
+                LNT.put(actual.estat, actual.g);
             }else{
                 if (estaEnCami(actual.pare, actual.estat)) {
                     rc.incNodesTallats();
@@ -41,6 +46,7 @@ public class CercaAStar extends Cerca {
             
             if(actual.estat.esMeta()){
                 rc.setCami(reconstruirCami(actual));
+                rc.updateMemoria(maxLNO + (usarLNT ? LNT.size() : 0));
                 return;
             }
             
@@ -48,16 +54,28 @@ public class CercaAStar extends Cerca {
             List<Moviment> accions = actual.estat.getAccionsPossibles();
             for(Moviment accio : accions){
                 Mapa nouEstat = actual.estat.mou(accio);
+                boolean descartar = false;
                 
-                if (usarLNT && LNT.contains(nouEstat)) continue;
-                Node nouNode = new Node(nouEstat, actual, accio, 
-                                       actual.depth + 1, actual.g + 1);
-                LNO.add(nouNode);
-                 
-            }
-             
+                if (usarLNT) {
+                    if (LNT.containsKey(nouEstat) && LNT.get(nouEstat) <= actual.g + 1) {
+                        rc.incNodesTallats();
+                        descartar = true;
+                    }
+                } else {
+                    if (estaEnCami(actual, nouEstat)) {
+                        rc.incNodesTallats();
+                        descartar = true;
+                    }
+                }
+                if (!descartar) {
+                    Node nouNode = new Node(nouEstat, actual, accio, 
+                                           actual.depth + 1, actual.g + 1);
+                    LNO.add(nouNode);
+                }  
+            }      
         }
         rc.setCami(null);
+        rc.updateMemoria(maxLNO + (usarLNT ? LNT.size() : 0));
     }
     
     private List<Moviment> reconstruirCami(Node nodeFinal) {

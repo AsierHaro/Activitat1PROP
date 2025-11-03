@@ -10,41 +10,63 @@ public class CercaBFS extends Cerca {
     @Override
     public void ferCerca(Mapa inicial, ResultatCerca rc) {
         Queue<Node> LNO = new LinkedList<>(); 
-        Set<Mapa> LNT = new HashSet<>();
-  
+        Set<Mapa> LNT = usarLNT ? new HashSet<>() : null;
+        int maxLNO = 0;
+
         Node nodeInicial = new Node(inicial, null, null, 0, 0);
         LNO.add(nodeInicial);
-        while(!LNO.isEmpty()){
+
+        if (usarLNT) {
+            LNT.add(inicial);
+        }
+
+        while (!LNO.isEmpty()) {
             Node actual = LNO.poll();
-            if(usarLNT){
-                if (LNT.contains(actual.estat)) continue;
-                LNT.add(actual.estat);
-            }else{
-                if (estaEnCami(actual.pare, actual.estat)) {
-                    rc.incNodesTallats();
-                    continue;
-                }
+
+            if (LNO.size() > maxLNO) {
+                maxLNO = LNO.size();
             }
-            
+
             rc.incNodesExplorats();
-            
-            if(actual.estat.esMeta()){
+
+            if (actual.estat.esMeta()) {
                 rc.setCami(reconstruirCami(actual));
+                rc.updateMemoria(maxLNO + (usarLNT ? LNT.size() : 0));
                 return;
             }
-            
+
             List<Moviment> accions = actual.estat.getAccionsPossibles();
-            for(Moviment accio : accions){
+            for (Moviment accio : accions) {
                 Mapa nouEstat = actual.estat.mou(accio);
-                
-                if (usarLNT && LNT.contains(nouEstat)) continue;
-                Node nouNode = new Node(nouEstat, actual, accio, 
-                                       actual.depth + 1, actual.g + 1);
-                LNO.add(nouNode);
-                 
+
+                boolean descartar = false;
+
+                if (usarLNT) {
+                    if (LNT.contains(nouEstat)) {
+                        rc.incNodesTallats();
+                        descartar = true;
+                    }
+                } else {
+                    if (estaEnCami(actual, nouEstat)) {
+                        rc.incNodesTallats();
+                        descartar = true;
+                    }
+                }
+
+                if (!descartar) {
+                    Node nouNode = new Node(nouEstat, actual, accio, 
+                                           actual.depth + 1, actual.g + 1);
+                    LNO.add(nouNode);
+
+                    if (usarLNT) {
+                        LNT.add(nouEstat);
+                    }
+                }
             }
         }
+
         rc.setCami(null);
+        rc.updateMemoria(maxLNO + (usarLNT ? LNT.size() : 0));
     }
     
     
