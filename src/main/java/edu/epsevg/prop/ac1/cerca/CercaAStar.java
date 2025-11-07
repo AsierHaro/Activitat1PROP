@@ -4,7 +4,7 @@ import edu.epsevg.prop.ac1.cerca.heuristica.Heuristica;
 import edu.epsevg.prop.ac1.model.*;
 import edu.epsevg.prop.ac1.resultat.ResultatCerca;
 import java.util.*;
-
+//
 
 public class CercaAStar extends Cerca {
 
