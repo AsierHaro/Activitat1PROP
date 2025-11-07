@@ -13,92 +13,100 @@ public class CercaIDS extends Cerca {
     @Override
     public void ferCerca(Mapa inicial, ResultatCerca rc) {
         int limitProfunditat = 0;
-        boolean solucioTrobada = false;
-       
-        while (!solucioTrobada && limitProfunditat < 100000000) {
-            Map<Mapa, Integer> LNT = usarLNT ? new HashMap<>() : null;
-            int maxMemoria = 0;
-           
-            Stack<Node> LNO = new Stack<>();
-            Node nodeInicial = new Node(inicial, null, null, 0, 0);
-            LNO.push(nodeInicial);
-           
-            while (!LNO.isEmpty()) {
-                Node actual = LNO.pop();
-                if (LNO.size() > maxMemoria) maxMemoria = LNO.size();
-               
-                if (usarLNT) {
-                    if (LNT.containsKey(actual.estat) && LNT.get(actual.estat) <= actual.depth) {
-                        rc.incNodesTallats();
-                        continue;
-                    }
-                    LNT.put(actual.estat, actual.depth);
-                } else {
-                    if (estaEnCami(actual.pare, actual.estat)) {
-                        rc.incNodesTallats();
-                        continue;
-                    }
-                }
-               
-                rc.incNodesExplorats();
-               
-                if (actual.estat.esMeta()) {
-                    rc.setCami(reconstruirCami(actual));
-                    rc.updateMemoria(maxMemoria + (usarLNT ? LNT.size() : 0));
-                    solucioTrobada = true;
-                    break;
-                }
-               
-              
-                if (actual.depth >= limitProfunditat) {
+        
+        while (limitProfunditat < 10000) {
+            List<Moviment> solucio = cercaLimitada(inicial, limitProfunditat, rc);
+            if (solucio != null) {
+                return; 
+            }
+            limitProfunditat++;
+        }
+        
+        rc.setCami(null);
+    }
+   
+    private List<Moviment> cercaLimitada(Mapa inicial, int limit, ResultatCerca rc) {
+        Stack<Node> LNO = new Stack<>();
+        Map<Mapa, Integer> LNT = usarLNT ? new HashMap<>() : null;
+        int maxLNO = 0;
+        
+        Node nodeInicial = new Node(inicial, null, null, 0, 0);
+        LNO.push(nodeInicial);
+        
+        while (!LNO.isEmpty()) {
+            Node actual = LNO.pop();
+            
+            if (LNO.size() > maxLNO) {
+                maxLNO = LNO.size();
+            }
+            
+            // Control de cicles
+            if (usarLNT) {
+                if (LNT.containsKey(actual.estat) && LNT.get(actual.estat) <= actual.depth) {
+                    rc.incNodesTallats();
                     continue;
                 }
-               
-                List<Moviment> accions = actual.estat.getAccionsPossibles();
-                for (Moviment accio : accions) {
-                    Mapa nouEstat = actual.estat.mou(accio);
-                    boolean descartar = false;
-                   
-                    if (usarLNT) {
-                        if (LNT.containsKey(nouEstat) && LNT.get(nouEstat) <= actual.depth + 1) {
-                            rc.incNodesTallats();
-                            descartar = true;
-                        }
-                    } else {
-                        if (estaEnCami(actual, nouEstat)) {
-                            rc.incNodesTallats();
-                            descartar = true;
-                        }
-                    }
-                   
-                    if (!descartar) {
-                        Node nouNode = new Node(nouEstat, actual, accio,
-                                              actual.depth + 1, actual.g + 1);
-                        LNO.push(nouNode);
-                    }
+                LNT.put(actual.estat, actual.depth);
+            } else {
+                if (estaEnCami(actual.pare, actual.estat)) {
+                    rc.incNodesTallats();
+                    continue;
                 }
             }
-           
-            if (!solucioTrobada) {
-                limitProfunditat++;
+            
+            rc.incNodesExplorats();
+            
+            if (actual.estat.esMeta()) {
+                rc.setCami(reconstruirCami(actual));
+                rc.updateMemoria(maxLNO + (usarLNT ? LNT.size() : 0));
+                return reconstruirCami(actual);
+            }
+            
+            if (actual.depth >= limit) {
+                continue;
+            }
+            
+            List<Moviment> accions = actual.estat.getAccionsPossibles();
+            for (int i = accions.size() - 1; i >= 0; i--) {
+                Moviment accio = accions.get(i);
+                Mapa nouEstat = actual.estat.mou(accio);
+                boolean descartar = false;
+                
+                if (usarLNT) {
+                    if (LNT.containsKey(nouEstat) && LNT.get(nouEstat) <= actual.depth + 1) {
+                        rc.incNodesTallats();
+                        descartar = true;
+                    }
+                } else {
+                    if (estaEnCami(actual, nouEstat)) {
+                        rc.incNodesTallats();
+                        descartar = true;
+                    }
+                }
+                
+                if (!descartar) {
+                    Node nouNode = new Node(nouEstat, actual, accio,
+                                          actual.depth + 1, actual.g + 1);
+                    LNO.push(nouNode);
+                }
             }
         }
-       
-        if (!solucioTrobada) {
-            rc.setCami(null);
-            rc.updateMemoria(0);
-        }
+        
+        int memoriaIteracio = maxLNO + (usarLNT ? LNT.size() : 0);
+        rc.updateMemoria(memoriaIteracio);
+        
+        return null; 
     }
    
     private List<Moviment> reconstruirCami(Node nodeFinal) {
         List<Moviment> cami = new ArrayList<>();
         Node actual = nodeFinal;
-       
+        
         while (actual.pare != null) {
             cami.add(0, actual.accio);
             actual = actual.pare;
         }
-       
+        
         return cami;
     }
    
