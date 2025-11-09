@@ -4,14 +4,7 @@ import edu.epsevg.prop.ac1.model.*;
 import edu.epsevg.prop.ac1.resultat.ResultatCerca;
 import java.util.*;
 
-/**
- * Cerca en profunditat (DFS)
- * 
- * Implementació segons les especificacions del PDF:
- *  - Control de cicles configurable (usarLNT)
- *  - Límit de profunditat de 50 nivells
- *  - LNT desa profunditat i només descarta si ja visitat a menor o igual profunditat
- */
+
 public class CercaDFS extends Cerca {
 
     private static final int PROF_MAX = 50;
