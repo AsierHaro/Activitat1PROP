@@ -247,20 +247,15 @@ public class Mapa {
         if(this == o) return true;
         if(o == null || getClass() != o.getClass()) return false;
         Mapa mapa = (Mapa) o;
-        if(!agents.equals(mapa.agents)) return false;
         if(clausMask != mapa.clausMask) return false;
-        if(grid.length != mapa.grid.length) return false;
-        for(int i = 0; i < grid.length; i++) if (!Arrays.equals(grid[i], mapa.grid[i])) return false;
-        return true;
+        return agents.equals(mapa.agents);
     }
 
     @Override
     public int hashCode() {
-        // ===============================================
-        //@TODO: A IMPLEMENTAR !!!!!!
-        // ===============================================
-        
-        return 0;
+        int result = agents.hashCode();
+        result = 31 * result + clausMask;
+        return result;
     }
 
     @Override
