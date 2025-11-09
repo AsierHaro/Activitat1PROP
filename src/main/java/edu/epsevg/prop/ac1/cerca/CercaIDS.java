@@ -14,7 +14,6 @@ public class CercaIDS extends Cerca {
 
     @Override
     public void ferCerca(Mapa inicial, ResultatCerca rc) {
-        // Cada iteració és independent: NO reutilitzem LNT entre iteracions
         for (int limit = 0; limit <= PROF_MAX; limit++) {
             List<Moviment> cami = cercaLimitada(inicial, rc, limit);
             if (cami != null) {
@@ -27,7 +26,6 @@ public class CercaIDS extends Cerca {
 
     private List<Moviment> cercaLimitada(Mapa inicial, ResultatCerca rc, int limit) {
         Deque<Node> LNO = new ArrayDeque<>();
-        // LNT és LOCAL a aquesta iteració de cerca limitada
         Map<Mapa, Integer> LNT = usarLNT ? new HashMap<>() : null;
 
         int memMax = 0;
@@ -41,7 +39,6 @@ public class CercaIDS extends Cerca {
             memMax = Math.max(memMax, memActual);
             rc.updateMemoria(memMax);
 
-            // Control de cicles dins d'aquesta cerca limitada
             if (LNT != null) {
                 Integer profAnterior = LNT.get(actual.estat);
                 if (profAnterior != null && profAnterior <= actual.depth) {
@@ -66,7 +63,6 @@ public class CercaIDS extends Cerca {
                 continue;
             }
 
-            // Expandir en ordre invers sense reverse()
             List<Moviment> moviments = actual.estat.getAccionsPossibles();
             for (int i = moviments.size() - 1; i >= 0; i--) {
                 Moviment mov = moviments.get(i);
