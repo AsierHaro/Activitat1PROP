@@ -5,44 +5,46 @@ import edu.epsevg.prop.ac1.resultat.ResultatCerca;
 import java.util.*;
 
 public class CercaIDS extends Cerca {
-   
+
+    private static final int PROF_MAX = 50;
+
     public CercaIDS(boolean usarLNT) {
         super(usarLNT);
     }
-   
+
     @Override
     public void ferCerca(Mapa inicial, ResultatCerca rc) {
-        int limitProfunditat = 0;
-        
-        while (limitProfunditat < 10000) {
-            List<Moviment> solucio = cercaLimitada(inicial, limitProfunditat, rc);
-            if (solucio != null) {
-                return; 
+        // Cada iteració és independent: NO reutilitzem LNT entre iteracions
+        for (int limit = 0; limit <= PROF_MAX; limit++) {
+            List<Moviment> cami = cercaLimitada(inicial, rc, limit);
+            if (cami != null) {
+                rc.setCami(cami);
+                return;
             }
-            limitProfunditat++;
         }
-        
         rc.setCami(null);
     }
-   
-    private List<Moviment> cercaLimitada(Mapa inicial, int limit, ResultatCerca rc) {
-        Stack<Node> LNO = new Stack<>();
+
+    private List<Moviment> cercaLimitada(Mapa inicial, ResultatCerca rc, int limit) {
+        Deque<Node> LNO = new ArrayDeque<>();
+        // LNT és LOCAL a aquesta iteració de cerca limitada
         Map<Mapa, Integer> LNT = usarLNT ? new HashMap<>() : null;
-        int maxLNO = 0;
-        
-        Node nodeInicial = new Node(inicial, null, null, 0, 0);
-        LNO.push(nodeInicial);
-        
+
+        int memMax = 0;
+        Node arrel = new Node(inicial, null, null, 0, 0);
+        LNO.push(arrel);
+
         while (!LNO.isEmpty()) {
             Node actual = LNO.pop();
-            
-            if (LNO.size() > maxLNO) {
-                maxLNO = LNO.size();
-            }
-            
-            // Control de cicles
-            if (usarLNT) {
-                if (LNT.containsKey(actual.estat) && LNT.get(actual.estat) <= actual.depth) {
+
+            int memActual = LNO.size() + (LNT != null ? LNT.size() : 0);
+            memMax = Math.max(memMax, memActual);
+            rc.updateMemoria(memMax);
+
+            // Control de cicles dins d'aquesta cerca limitada
+            if (LNT != null) {
+                Integer profAnterior = LNT.get(actual.estat);
+                if (profAnterior != null && profAnterior <= actual.depth) {
                     rc.incNodesTallats();
                     continue;
                 }
@@ -53,27 +55,34 @@ public class CercaIDS extends Cerca {
                     continue;
                 }
             }
-            
+
             rc.incNodesExplorats();
-            
+
             if (actual.estat.esMeta()) {
-                rc.setCami(reconstruirCami(actual));
-                rc.updateMemoria(maxLNO + (usarLNT ? LNT.size() : 0));
                 return reconstruirCami(actual);
             }
-            
+
             if (actual.depth >= limit) {
                 continue;
             }
-            
-            List<Moviment> accions = actual.estat.getAccionsPossibles();
-            for (int i = accions.size() - 1; i >= 0; i--) {
-                Moviment accio = accions.get(i);
-                Mapa nouEstat = actual.estat.mou(accio);
+
+            // Expandir en ordre invers sense reverse()
+            List<Moviment> moviments = actual.estat.getAccionsPossibles();
+            for (int i = moviments.size() - 1; i >= 0; i--) {
+                Moviment mov = moviments.get(i);
+                Mapa nouEstat;
+                try {
+                    nouEstat = actual.estat.mou(mov);
+                } catch (IllegalArgumentException e) {
+                    continue;
+                }
+
+                int novaProf = actual.depth + 1;
                 boolean descartar = false;
-                
-                if (usarLNT) {
-                    if (LNT.containsKey(nouEstat) && LNT.get(nouEstat) <= actual.depth + 1) {
+
+                if (LNT != null) {
+                    Integer profVist = LNT.get(nouEstat);
+                    if (profVist != null && profVist <= novaProf) {
                         rc.incNodesTallats();
                         descartar = true;
                     }
@@ -83,56 +92,30 @@ public class CercaIDS extends Cerca {
                         descartar = true;
                     }
                 }
-                
+
                 if (!descartar) {
-                    Node nouNode = new Node(nouEstat, actual, accio,
-                                          actual.depth + 1, actual.g + 1);
-                    LNO.push(nouNode);
+                    LNO.push(new Node(nouEstat, actual, mov, novaProf, novaProf));
                 }
             }
         }
-        
-        int memoriaIteracio = maxLNO + (usarLNT ? LNT.size() : 0);
-        rc.updateMemoria(memoriaIteracio);
-        
-        return null; 
+
+        return null;
     }
-   
+
     private List<Moviment> reconstruirCami(Node nodeFinal) {
-        List<Moviment> cami = new ArrayList<>();
-        Node actual = nodeFinal;
-        
-        while (actual.pare != null) {
-            cami.add(0, actual.accio);
-            actual = actual.pare;
+        LinkedList<Moviment> cami = new LinkedList<>();
+        for (Node n = nodeFinal; n.pare != null; n = n.pare) {
+            cami.addFirst(n.accio);
         }
-        
         return cami;
     }
-   
+
     private boolean estaEnCami(Node node, Mapa estat) {
-        while (node != null) {
-            if (node.estat.equals(estat)) {
+        for (Node n = node; n != null; n = n.pare) {
+            if (n.estat.equals(estat)) {
                 return true;
             }
-            node = node.pare;
         }
         return false;
-    }
-   
-    private static class Node {
-        Mapa estat;
-        Node pare;
-        Moviment accio;
-        int depth;
-        int g;
-       
-        Node(Mapa estat, Node pare, Moviment accio, int depth, int g) {
-            this.estat = estat;
-            this.pare = pare;
-            this.accio = accio;
-            this.depth = depth;
-            this.g = g;
-        }
     }
 }

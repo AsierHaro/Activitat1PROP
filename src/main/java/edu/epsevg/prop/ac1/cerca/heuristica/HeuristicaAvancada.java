@@ -1,229 +1,119 @@
 package edu.epsevg.prop.ac1.cerca.heuristica;
-
 import edu.epsevg.prop.ac1.model.Mapa;
 import edu.epsevg.prop.ac1.model.Posicio;
-import java.util.*;
 
-/**
- * Heurística avançada (versió neta i robusta).
- * - No guarda "inicialitzat" global; s'inicialitza quan cal.
- * - Evita supòsits perillosos i compila net amb CercaAStar.
+/** 
+ * Heurística avançada optimitzada per competició.
+ * 
+ * Estratègia:
+ * 1. Si queden claus pendents: distància Manhattan mínima des de qualsevol agent 
+ *    a la clau no recollida més propera
+ * 2. Si totes les claus recollides: distància Manhattan mínima des de qualsevol 
+ *    agent a la sortida
+ * 
+ * Optimitzacions implementades:
+ * - Inicialització lazy: només es recorre el mapa una vegada
+ * - Arrays en lloc de Lists per evitar overhead
+ * - Càlcul directe de màscara completa de claus
+ * - Accés directe a grid via getCellAt (més ràpid que getCell privat)
+ * - Sortida primerenca si ja som a meta
+ * - Comparacions mínimes necessàries
+ * 
+ * Propietat d'admissibilitat:
+ * L'heurística és admissible perquè la distància Manhattan (ignorant obstacles)
+ * mai sobreestima el cost real del camí més curt, ja que cada moviment té cost 1
+ * i la Manhattan és el mínim de moviments necessaris en graella sense obstacles.
  */
 public class HeuristicaAvancada implements Heuristica {
-
-    private List<Posicio> posicionsClaus = null;
-    private Posicio sortida = null;
-    private Map<Character, Posicio> portesMap = null;
-    private int n = 0, m = 0;
-
+    private Posicio[] posicionsClaus;
+    private int[] indicesClaus; 
+    private Posicio sortida;
+    private int numClaus;
+    private int maskComplet; 
+    private boolean inicialitzat = false;
+    
     @Override
     public int h(Mapa estat) {
-        if (estat == null) return 0;
-
-        // Inicialitzar si encara no ho hem fet (o si el mapa sembla diferent)
-        if (posicionsClaus == null || portesMap == null) {
+        if (!inicialitzat) {
             inicialitzar(estat);
         }
-
-        if (estat.esMeta()) return 0;
-
-        List<Posicio> agents = estat.getAgents();
+        
+        if (estat.esMeta()) {
+            return 0;
+        }
+        
         int clausMask = estat.getClausMask();
-
-        List<Posicio> clausPendents = getClausPendents(estat, clausMask);
-
-        if (!clausPendents.isEmpty()) {
-            return estimarCostTotalClaus(agents, clausPendents, estat)
-                    + penalitzacioDispersio(agents)
-                    + bonificacioPortesNecessaries(agents, clausPendents, estat, clausMask);
-        } else {
-            int distMinSortida = Integer.MAX_VALUE;
-            for (Posicio agent : agents) {
-                int dist = distanciaAmbObstacles(agent, sortida, estat);
-                distMinSortida = Math.min(distMinSortida, dist);
-            }
-            if (distMinSortida == Integer.MAX_VALUE) distMinSortida = 0;
-            return distMinSortida + penalitzacioDispersio(agents) / 2;
+        
+        if (clausMask == maskComplet) {
+            return distanciaMinimaSortida(estat);
         }
+        
+        return distanciaMinimaClauPendent(estat, clausMask);
     }
-
-    private int estimarCostTotalClaus(List<Posicio> agents, List<Posicio> clausPendents, Mapa estat) {
-        if (clausPendents.isEmpty()) return 0;
-        int costMinim = Integer.MAX_VALUE;
-        for (Posicio agent : agents) {
-            int costAgent = estimarRecorregutClaus(agent, clausPendents, estat);
-            costMinim = Math.min(costMinim, costAgent);
-        }
-        return costMinim == Integer.MAX_VALUE ? 0 : costMinim;
-    }
-
-    private int estimarRecorregutClaus(Posicio inici, List<Posicio> claus, Mapa estat) {
-        if (claus.isEmpty()) return 0;
-
-        Set<Posicio> visitats = new HashSet<>();
-        Posicio actual = inici;
-        int costTotal = 0;
-
-        while (visitats.size() < claus.size()) {
-            Posicio clauMesPropera = null;
-            int distMinima = Integer.MAX_VALUE;
-
-            for (Posicio clau : claus) {
-                if (!visitats.contains(clau)) {
-                    int dist = distanciaAmbObstacles(actual, clau, estat);
-                    if (dist < distMinima) {
-                        distMinima = dist;
-                        clauMesPropera = clau;
-                    }
-                }
-            }
-
-            if (clauMesPropera != null) {
-                costTotal += distMinima;
-                actual = clauMesPropera;
-                visitats.add(clauMesPropera);
-            } else {
-                break;
-            }
-        }
-
-        // Afegir distància a la sortida des de l'última clau (si hi ha sortida)
-        if (sortida != null) {
-            costTotal += distanciaAmbObstacles(actual, sortida, estat);
-        }
-
-        return costTotal;
-    }
-
-    private int distanciaAmbObstacles(Posicio origen, Posicio desti, Mapa estat) {
-        if (origen == null || desti == null) return 0;
-        if (origen.equals(desti)) return 0;
-
-        Queue<PosicioDist> cua = new LinkedList<>();
-        Set<Posicio> visitats = new HashSet<>();
-
-        cua.add(new PosicioDist(origen, 0));
-        visitats.add(origen);
-
-        int[][] dirs = {{-1,0}, {1,0}, {0,-1}, {0,1}};
-        int maxIteracions = Math.max(100, n * m); // assegurar un límit raonable
-        int iteracions = 0;
-
-        while (!cua.isEmpty() && iteracions < maxIteracions) {
-            PosicioDist actual = cua.poll();
-            iteracions++;
-
-            if (actual.pos.equals(desti)) {
-                return actual.dist;
-            }
-
-            for (int[] dir : dirs) {
-                int nx = actual.pos.x + dir[0];
-                int ny = actual.pos.y + dir[1];
-                Posicio nova = new Posicio(nx, ny);
-
-                if (esPosicioValida(nx, ny, estat) && !visitats.contains(nova)) {
-                    int cell = estat.getCellAt(nx, ny);
-                    // Permetre passar per quasi tot (claus, portes, sortida, espai buit),
-                    // i bloquejar només parets (assumem '#' com a mur)
-                    if (cell != '#' ) {
-                        visitats.add(nova);
-                        cua.add(new PosicioDist(nova, actual.dist + 1));
-                    }
-                }
-            }
-        }
-
-        // fallback: Manhattan si BFS falla
-        return Math.abs(origen.x - desti.x) + Math.abs(origen.y - desti.y);
-    }
-
-    private int penalitzacioDispersio(List<Posicio> agents) {
-        if (agents == null || agents.size() <= 1) return 0;
-
-        int distanciaMaxima = 0;
-        for (int i = 0; i < agents.size(); i++) {
-            for (int j = i + 1; j < agents.size(); j++) {
-                int dist = distanciaManhattan(agents.get(i), agents.get(j));
-                distanciaMaxima = Math.max(distanciaMaxima, dist);
-            }
-        }
-        return distanciaMaxima / 4;
-    }
-
-    private int bonificacioPortesNecessaries(List<Posicio> agents, List<Posicio> clausPendents,
-                                             Mapa estat, int clausMask) {
-        if (portesMap == null || agents == null) return 0;
-        int bonificacio = 0;
-
-        for (Map.Entry<Character, Posicio> entrada : portesMap.entrySet()) {
-            char porta = entrada.getKey();
-            int idxClau = Character.toLowerCase(porta) - 'a';
-            if (idxClau < 0 || idxClau >= 32) continue;
-
-            // Si no tenim la clau d'aquesta porta
-            if ((clausMask & (1 << idxClau)) == 0) {
-                Posicio posPorta = entrada.getValue();
-                for (Posicio agent : agents) {
-                    int distPorta = distanciaManhattan(agent, posPorta);
-                    if (distPorta <= 3) {
-                        bonificacio -= distPorta;
-                    }
-                }
-            }
-        }
-
-        return bonificacio;
-    }
-
-    private List<Posicio> getClausPendents(Mapa estat, int clausMask) {
-        List<Posicio> pendents = new ArrayList<>();
-        if (posicionsClaus == null) return pendents;
-
-        for (Posicio posClau : posicionsClaus) {
-            int cell = estat.getCellAt(posClau.x, posClau.y);
-            if (!Character.isLowerCase((char) cell)) continue;
-            char clau = (char) cell;
-            int idx = clau - 'a';
-            if (idx < 0 || idx >= 32) continue;
-            if ((clausMask & (1 << idx)) == 0) {
-                pendents.add(posClau);
-            }
-        }
-        return pendents;
-    }
-
+    
     private void inicialitzar(Mapa estat) {
-        posicionsClaus = new ArrayList<>();
-        portesMap = new HashMap<>();
-        n = estat.getN();
-        m = estat.getM();
-
+        int n = estat.getN();
+        int m = estat.getM();
+        
+        numClaus = 0;
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < m; j++) {
                 int cell = estat.getCellAt(i, j);
-                if (Character.isLowerCase((char) cell)) {
-                    posicionsClaus.add(new Posicio(i, j));
-                } else if (Character.isUpperCase((char) cell)) {
-                    portesMap.put((char) cell, new Posicio(i, j));
-                } else if (cell == '@') {
+                if (cell >= 'a' && cell <= 'z') {
+                    numClaus++;
+                }
+            }
+        }
+        
+        maskComplet = (1 << numClaus) - 1;
+        
+        posicionsClaus = new Posicio[numClaus];
+        indicesClaus = new int[numClaus];
+        int idx = 0;
+        
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                int cell = estat.getCellAt(i, j);
+                if (cell >= 'a' && cell <= 'z') {
+                    posicionsClaus[idx] = new Posicio(i, j);
+                    indicesClaus[idx] = cell - 'a';
+                    idx++;
+                } else if (cell == Mapa.SORTIDA) {
                     sortida = new Posicio(i, j);
                 }
             }
         }
+        
+        inicialitzat = true;
     }
-
-    private boolean esPosicioValida(int x, int y, Mapa estat) {
-        return x >= 0 && x < n && y >= 0 && y < m;
+    
+    private int distanciaMinimaSortida(Mapa estat) {
+        int min = Integer.MAX_VALUE;
+        for (Posicio agent : estat.getAgents()) {
+            int dist = Math.abs(agent.x - sortida.x) + Math.abs(agent.y - sortida.y);
+            if (dist < min) {
+                min = dist;
+            }
+        }
+        return min;
     }
-
-    private int distanciaManhattan(Posicio p1, Posicio p2) {
-        return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y);
-    }
-
-    private static class PosicioDist {
-        Posicio pos;
-        int dist;
-        PosicioDist(Posicio pos, int dist) { this.pos = pos; this.dist = dist; }
+    
+    private int distanciaMinimaClauPendent(Mapa estat, int clausMask) {
+        int min = Integer.MAX_VALUE;
+        
+        for (int i = 0; i < numClaus; i++) {
+            if ((clausMask & (1 << indicesClaus[i])) == 0) {
+                Posicio clau = posicionsClaus[i];
+                
+                for (Posicio agent : estat.getAgents()) {
+                    int dist = Math.abs(agent.x - clau.x) + Math.abs(agent.y - clau.y);
+                    if (dist < min) {
+                        min = dist;
+                    }
+                }
+            }
+        }
+        
+        return min;
     }
 }
